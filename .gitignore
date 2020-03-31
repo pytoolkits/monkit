@@ -1,0 +1,3 @@
+dist/
+sdist/
+*.egg-info/
