@@ -11,7 +11,7 @@ import requests
 import argparse
 import threading
 
-def monpush(metric, value, tags=''):
+def monpush(push_mon_url, endpoint, metric, value, tags=''):
     step = 60
     headers = {'Content-Type': 'application/json'}
     payload = [{'endpoint': endpoint, 'metric':metric, 'timestamp':int(time.time()), 'step':step, 'value':value, 'tags':tags}]
@@ -30,6 +30,8 @@ def test_web(**kw):
     CONNECTTIMEOUT = 30
     TIMEOUT = 50
     t = StringIO.StringIO()
+    push_mon_url = kw['push_mon_url']
+    endpoint = kw['endpoint']
     api = kw['api']
     method = kw['method']
     post_data= kw['params']
@@ -78,13 +80,13 @@ def test_web(**kw):
     c.setopt(pycurl.HTTPHEADER, header_list)
     try:
         c.perform()
-        monpush('url.error', 1, tags)
-    except Exception,e:
+        monpush(push_mon_url, endpoint, 'url.error', 1, tags)
+    except Exception as e:
         c.close()
         if 'timed out' in e[1]:
-            monpush('url.timeout_error', -1, tags)
+            monpush(push_mon_url, endpoint, 'url.timeout_error', -1, tags)
         else:
-            monpush('url.error', -1, tags)
+            monpush(push_mon_url, endpoint, 'url.error', -1, tags)
         return e
     d = {}
     d['dns_time'] = c.getinfo(pycurl.NAMELOOKUP_TIME)                    #DNS 建连时间
@@ -103,26 +105,26 @@ def test_web(**kw):
 
     if level == 1:
         for k,v in d.items():
-            monpush('url.' + k, v, tags)
+            monpush(push_mon_url, endpoint, 'url.' + k, v, tags)
     else:
-        monpush('url.http_code', d['http_code'], tags)
-        monpush('url.total_time', d['total_time'], tags)
+        monpush(push_mon_url, endpoint, 'url.http_code', d['http_code'], tags)
+        monpush(push_mon_url, endpoint, 'url.total_time', d['total_time'], tags)
 
     code_value = timeout_value = 1
     if d['http_code'] != expect_httpcode: code_value = -1
     if d['total_time'] > timeout: timeout_value = -1
-    monpush('url.http_code_error', code_value, tags)
-    monpush('url.timeout_error', timeout_value, tags)
+    monpush(push_mon_url, endpoint, 'url.http_code_error', code_value, tags)
+    monpush(push_mon_url, endpoint, 'url.timeout_error', timeout_value, tags)
 
     string_value = 1
     if expect_string:
         if not re.search(expect_string, unicode(t.getvalue(), 'utf-8')): string_value = -1
-        monpush('url.string_error', string_value, tags)
+        monpush(push_mon_url, endpoint, 'url.string_error', string_value, tags)
 
     t.close()
     return code_value, timeout_value, string_value
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--config", help="config file")
     args = parser.parse_args()
@@ -144,6 +146,8 @@ if __name__ == '__main__':
             conf_list = res['tasks']
             threads = []
             for conf in conf_list:
+                conf['push_mon_url'] = push_mon_url
+                conf['endpoint'] = endpoint
                 t = threading.Thread(target=test_web, kwargs=conf)
                 threads.append(t)
             for t in threads:
@@ -152,4 +156,7 @@ if __name__ == '__main__':
                 while True:
                     if(len(threading.enumerate()) <= thread_count):
                         break
-        monpush('url.getconf_error', getconf_value)
+        monpush(push_mon_url, endpoint, 'url.getconf_error', getconf_value)
+
+if __name__ == '__main__':
+    main()
