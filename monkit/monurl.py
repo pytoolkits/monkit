@@ -1,36 +1,27 @@
 #!/usr/bin/env python
 # coding: utf-8
 import os
-import time
-import sys
 import re
+import time
+import json
+import yaml
 import StringIO
 import pycurl
 import requests
-import urllib
-import json
+import argparse
 import threading
-import socket
-
 
 def monpush(metric, value, tags=''):
-    furl = 'http://127.0.0.1:2058/api/collector/push'
     step = 60
-    payload = [{'metric':metric, 'timestamp':int(time.time()), 'step':step, 'value':value, 'tags':tags}]
     headers = {'Content-Type': 'application/json'}
-    ret = requests.post(furl, data=json.dumps(payload), headers=headers, timeout=5)
+    payload = [{'endpoint': endpoint, 'metric':metric, 'timestamp':int(time.time()), 'step':step, 'value':value, 'tags':tags}]
+    ret = requests.post(push_mon_url, data=json.dumps(payload), headers=headers, timeout=5)
     return ret.text
 
-def request_get(url, timeout=5, headers=None):
-    import re
+def request_get(url, timeout=5):
     ret = err = None
     try:
-        import requests
-    except Exception as e:
-        return ret, e
-    if not re.match('https?://',url.strip()): url = 'http://' + url
-    try:
-        ret = requests.get(url, timeout=timeout, headers=headers)
+        ret = requests.get(url, timeout=timeout)
     except Exception as e:
         return ret, e
     return ret, err
@@ -131,30 +122,34 @@ def test_web(**kw):
     t.close()
     return code_value, timeout_value, string_value
 
-def main():
-    api = sys.argv[1]
-    hostname = socket.gethostname()
-    ip = socket.gethostbyname(hostname)
-    url = '{}?task_type=api&ip={}'.format(api, ip)
-    ret, err = request_get(url)
-    thread_count = 100
-    getconf_value = 1
-    if not err and ret.status_code == 200:
-        res = ret.json()
-        agent_name = res['agent_name']
-        conf_list = res['tasks']
-        threads = []
-        for conf in conf_list:
-            t = threading.Thread(target=test_web, kwargs=conf)
-            threads.append(t)
-        for t in threads:
-            #t.setDaemon(True)
-            t.start()
-            while True:
-                if(len(threading.enumerate()) <= thread_count):
-                    break
-    else:
-        getconf_value = -1
-
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--config", help="config file")
+    args = parser.parse_args()
+    if args.config and os.path.exists(args.config):
+        f = open(args.config)
+        data = yaml.load(f, Loader=yaml.FullLoader)
+        f.close()
+        push_mon_url = data.get('push_mon_url', '')
+        get_conf_url = data.get('get_conf_url', '')
+        endpoint = data.get('endpoint', '')
+        url = '{}?task_type=api&ip={}'.format(get_conf_url, endpoint)
+        ret, err = request_get(url)
+        thread_count = 100
+        getconf_value = 0
+        if not err and ret.status_code == 200:
+            getconf_value = 1
+            res = ret.json()
+            agent_name = res['agent_name']
+            conf_list = res['tasks']
+            threads = []
+            for conf in conf_list:
+                t = threading.Thread(target=test_web, kwargs=conf)
+                threads.append(t)
+            for t in threads:
+                #t.setDaemon(True)
+                t.start()
+                while True:
+                    if(len(threading.enumerate()) <= thread_count):
+                        break
+        monpush('url.getconf_error', getconf_value)
