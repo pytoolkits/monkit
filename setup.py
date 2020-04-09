@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = "monkit",
-    version = "0.0.1",
+    version = "0.0.2",
     keywords = ["monurl", "monitor", "monkit"],
     description = "monitor kit client",
     long_description = "monitor kit client",
