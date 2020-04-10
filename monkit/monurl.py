@@ -130,7 +130,10 @@ def main():
     args = parser.parse_args()
     if args.config and os.path.exists(args.config):
         f = open(args.config)
-        data = yaml.load(f, Loader=yaml.FullLoader)
+        if hasattr(yaml, 'FullLoader'):
+            data = yaml.load(f, Loader=yaml.FullLoader)
+        else:
+            data = yaml.load(f)
         f.close()
         push_mon_url = data.get('push_mon_url', '')
         get_conf_url = data.get('get_conf_url', '')
