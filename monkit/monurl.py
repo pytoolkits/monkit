@@ -66,7 +66,7 @@ def test_web(**kw):
     c.setopt(pycurl.CONNECTTIMEOUT, CONNECTTIMEOUT) #连接超时
     c.setopt(pycurl.TIMEOUT, TIMEOUT)    #下载超时
 
-    c.setopt(pycurl.REFERER, "Url-Monitor/1.0")
+    # c.setopt(pycurl.REFERER, "Url-Monitor/1.0")
     header_list = []
     #header_list.append('Host:' + str(domain))
     if headers:
@@ -141,7 +141,7 @@ def main():
         url = '{}?task_type=api&ip={}'.format(get_conf_url, endpoint)
         ret, err = request_get(url)
         thread_count = 100
-        getconf_value = 0
+        getconf_value = -1
         if not err and ret.status_code == 200:
             getconf_value = 1
             res = ret.json()
